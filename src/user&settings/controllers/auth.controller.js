@@ -3,9 +3,9 @@ import Rol from '../models/rol.model.js';
 import bcrypt from 'bcryptjs';
 import { createAccessToken } from '../libs/jwt.js';
 import PasswordResetToken from '../models/passwordResetToken.model.js';
-import sgMail from '@sendgrid/mail';
 import axios from 'axios'; 
 import { OAuth2Client } from 'google-auth-library';
+import nodemailer from 'nodemailer';
 
 // ✅ FIX: Definimos la constante desde las variables de entorno
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
@@ -226,40 +226,47 @@ export const profile = async (req, res) => {
     })
 };
 
-export const forgotPassword = async (req, res) => {  
-  try {  
-    const { email, cedula } = req.body;  
-  
-    const user = await User.findOne({ email, cedula });  
-    if (!user) {  
-      return res.status(404).json({ message: 'Usuario no encontrado' });  
-    }  
-  
-    const resetToken = Math.floor(100000 + Math.random() * 900000).toString();  
-    const resetTokenExpires = Date.now() + 5 * 60 * 1000;  
-  
-    await PasswordResetToken.create({  
-      userId: user._id,  
-      token: resetToken,  
-      expiresAt: resetTokenExpires,  
+export const forgotPassword = async (req, res) => {    
+  try {    
+    const { email, cedula } = req.body;    
+    
+    const user = await User.findOne({ email, cedula });    
+    if (!user) {    
+      return res.status(404).json({ message: 'Usuario no encontrado' });    
+    }    
+    
+    const resetToken = Math.floor(100000 + Math.random() * 900000).toString();    
+    const resetTokenExpires = Date.now() + 5 * 60 * 1000;    
+    
+    await PasswordResetToken.create({    
+      userId: user._id,    
+      token: resetToken,    
+      expiresAt: resetTokenExpires,    
+    });    
+    
+    // Configura el transporter de Nodemailer  
+    const transporter = nodemailer.createTransport({  
+      service: 'gmail',  
+      auth: {  
+        user: 'iqscoreking@gmail.com',  
+        pass: process.env.GMAIL_APP_PASSWORD // Usa una variable de entorno para la contraseña de aplicación  
+      }  
     });  
   
-    sgMail.setApiKey(process.env.SENDGRID_API_KEY);  
-  
-    const msg = {  
+    const mailOptions = {  
+      from: 'iqscoreking@gmail.com',  
       to: email,  
-      from: process.env.SENDGRID_FROM,
       subject: 'Recuperación de contraseña',  
-      text: `Tu código de recuperación es: ${resetToken}. Este código expira en 5 minutos.`,  
+      text: `Tu código de recuperación es: ${resetToken}. Este código expira en 5 minutos.`  
     };  
   
-    await sgMail.send(msg);  
+    await transporter.sendMail(mailOptions);  
   
-    res.json({ message: 'Correo de recuperación enviado' });  
-  } catch (error) {  
-    console.error('Error al enviar el correo:', error);  
-    res.status(500).json({ message: error.message });  
-  }  
+    res.json({ message: 'Correo de recuperación enviado' });    
+  } catch (error) {    
+    console.error('Error al enviar el correo:', error);    
+    res.status(500).json({ message: error.message });    
+  }    
 };
 
 export const verifyResetToken = async (req, res) => {
