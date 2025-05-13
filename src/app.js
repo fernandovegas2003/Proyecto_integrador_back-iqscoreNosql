@@ -19,49 +19,49 @@ import session from 'express-session';
 
 const app = express();
 
-// 1. Configuración CORS mejorada
+// 1. Configuración CORS mejorada y simplificada
 const allowedOrigins = [
   'http://localhost:5173',
-  'http://13.218.132.66:5173', // IP de tu frontend
-  'http://54.234.36.48:5173',  // IP de tu backend (por si acaso)
-  'https://tudominio.com',
+  'https://iqscore.space',
+  'https://www.iqscore.space',
+  'http://iqscore.space',
+  'http://www.iqscore.space',
   process.env.FRONTEND_URL
-].filter(Boolean); // Elimina valores undefined
+].filter(Boolean);
 
-const corsOptions = {
-  origin: function (origin, callback) {
-    // Permitir solicitudes sin origen (como mobile apps o curl)
-    if (!origin) return callback(null, true);
-    
-    // Verificar contra la lista de orígenes permitidos
-    if (allowedOrigins.some(allowedOrigin => {
-      return origin === allowedOrigin || 
-             origin.startsWith(allowedOrigin.replace('http://', 'https://')) ||
-             new URL(origin).hostname === new URL(allowedOrigin).hostname;
-    })) {
-      return callback(null, true);
-    }
-    
-    console.warn(`⚠️ Origen no permitido por CORS: ${origin}`);
-    callback(new Error('Not allowed by CORS'));
-  },
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: [
-    'Content-Type', 
-    'Authorization', 
-    'X-Requested-With', 
-    'X-CSRF-Token',
-    'Accept',
-    'Origin'
-  ],
-  credentials: true,
-  optionsSuccessStatus: 200,
-  preflightContinue: false,
-  maxAge: 86400 // Cachear opciones CORS por 24 horas
-};
-
-// Aplicar CORS a todas las rutas
-app.use(cors(corsOptions));
+// Middleware CORS más permisivo para desarrollo
+if (process.env.NODE_ENV === 'development') {
+  app.use(cors({
+    origin: true, // Permite cualquier origen en desarrollo
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  }));
+} else {
+  // Configuración CORS para producción
+  app.use(cors({
+    origin: function (origin, callback) {
+      // Permitir solicitudes sin origen (como mobile apps o curl)
+      if (!origin) return callback(null, true);
+      
+      // Verificar si el origen está en la lista blanca
+      if (allowedOrigins.some(allowedOrigin => {
+        return origin === allowedOrigin || 
+               origin.includes(allowedOrigin.replace(/https?:\/\//, '')) ||
+               origin.includes(allowedOrigin.replace('www.', ''));
+      })) {
+        return callback(null, true);
+      }
+      
+      console.warn(`⚠️ Origen no permitido por CORS: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    optionsSuccessStatus: 200
+  }));
+}
 
 // 2. Middlewares esenciales
 app.use(morgan('dev'));
@@ -80,14 +80,17 @@ app.use(session({
     sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
     maxAge: 24 * 60 * 60 * 1000
   },
-  name: 'sessionId' // Nombre personalizado para la cookie
+  name: 'sessionId'
 }));
 
 // 4. Inicializar Passport
 app.use(passport.initialize());
 app.use(passport.session());
 
-// 5. Rutas API
+// 5. Middleware para manejar preflight OPTIONS requests
+app.options('*', cors()); // Habilitar preflight para todas las rutas
+
+// 6. Rutas API
 app.use('/api', authRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/paypal', paypalRoutes);
@@ -96,7 +99,7 @@ app.use('/api/scraping', scrapingRoutes);
 app.use('/api/scraping', scrapingRoutesLigas);
 app.use('/api/auth', googleAuthRoutes);
 
-// 6. Middleware para manejar rutas no encontradas
+// 7. Middleware para manejar rutas no encontradas
 app.use((req, res, next) => {
   res.status(404).json({ 
     success: false,
@@ -105,7 +108,7 @@ app.use((req, res, next) => {
   });
 });
 
-// 7. Manejador de errores global mejorado
+// 8. Manejador de errores global mejorado
 app.use((err, req, res, next) => {
   console.error('🔥 Error:', err.stack);
   
@@ -114,7 +117,7 @@ app.use((err, req, res, next) => {
     return res.status(403).json({
       success: false,
       message: 'Acceso no permitido por política CORS',
-      allowedOrigins: allowedOrigins.filter(o => o !== process.env.FRONTEND_URL)
+      allowedOrigins: allowedOrigins
     });
   }
 
