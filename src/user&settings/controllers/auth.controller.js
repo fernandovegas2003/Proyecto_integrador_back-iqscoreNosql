@@ -95,16 +95,16 @@ export const login = async (req, res) => {
   try {
     const { emailOrUsername, password, rememberMe, captcha } = req.body;
 
-    if (!captcha) {
-      return res.status(400).json({ message: "Captcha requerido" });
-    }
-    const secret = "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"; 
-    const verifyUrl = `https://www.google.com/recaptcha/api/siteverify?secret=${secret}&response=${captcha}`;
-    const { data } = await axios.post(verifyUrl);
+   // if (!captcha) {
+     // return res.status(400).json({ message: "Captcha requerido" });
+    //}
+    //const secret = "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"; 
+    //const verifyUrl = `https://www.google.com/recaptcha/api/siteverify?secret=${secret}&response=${captcha}`;
+    // const { data } = await axios.post(verifyUrl);
 
-    if (!data.success) {
-      return res.status(400).json({ message: "Captcha inválido" });
-    }
+    //  if (!data.success) {
+     // return res.status(400).json({ message: "Captcha inválido" });
+    //}
 
     const user = await User.findOne({
       $or: [{ email: emailOrUsername }, { username: emailOrUsername }],
